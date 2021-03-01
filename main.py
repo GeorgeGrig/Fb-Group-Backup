@@ -5,11 +5,13 @@ from selenium.webdriver.support import expected_conditions as EC
 from selenium.webdriver.firefox.options import Options
 from selenium.webdriver import ActionChains
 from selenium.webdriver.common.keys import Keys
-import time
+from selenium.common.exceptions import TimeoutException
+import time, os
 import itertools
 
 download_dir = 'D:\\Programming\\Current\\Fb-Group-Backup\\Downloads'
 groupUrl = 'https://www.facebook.com/groups/PhysicsDepThess/'
+download_time = '2'
 
 # Set Firefox preferences so that the file automatically saves to disk when downloaded
 profile = webdriver.FirefoxProfile()
@@ -27,10 +29,8 @@ profile.set_preference("browser.download.manager.closeWhenDone", True)
 profile.set_preference("pdfjs.disabled", True)
 
 
-# todo
-# add show newest files first
-# get more info from post (poster name and post date)
 def login():
+    # Manually login to avoid facebook's  bot detection
     driver = webdriver.Firefox(firefox_profile=profile)
     driver.get('https://www.facebook.com/login/web/')
     input()
@@ -40,7 +40,7 @@ def goto_group_files(groupUrl,driver):
     #Navigate to group files
     driver.get(groupUrl+'files/')
     # Scroll down to reveal all files
-    SCROLL_PAUSE_TIME = 3
+    SCROLL_PAUSE_TIME = 5
     last_height = driver.execute_script("return document.body.scrollHeight")
     while True:
         driver.execute_script("window.scrollTo(0, document.body.scrollHeight);")
@@ -51,8 +51,25 @@ def goto_group_files(groupUrl,driver):
         last_height = new_height
     # Get all triple dots button locations
     dots = driver.find_elements_by_css_selector('span.tmrshh9y.pfnyh3mw.j83agx80.bp9cbjyn')
+    # Get additional info inluding poster name and post date
+    names = driver.find_elements_by_css_selector('a.oajrlxb2.g5ia77u1.qu0x051f.esr5mh6w.e9989ue4.r7d6kgcz.rq0escxv.nhd2j8a9.nc684nl6.p7hjln8o.kvgmc6g5.cxmmr5t8.oygrvhab.hcukyx3x.jb3vyjys.rz4wbd8a.qt6c0cv9.a8nywdso.i1ao9s8h.esuyzwwr.f1sip0of.lzcic4wl.gmql0nx0.gpro0wi8.b1v8xokw')
+    user_names = []
+    file_dates = []
+    file_names = []
+    k = 3
+    for name in names:
+        user_names.append(name.text)
+        file_dates.append(driver.find_element_by_xpath(f'/html/body/div[1]/div/div[1]/div/div[3]/div/div/div[1]/div[1]/div[4]/div/div/div/div/div[2]/div[{k}]/span[3]/div/div[1]/span/span').text.split('at')[0])
+        k += 1
+    names = driver.find_elements_by_css_selector('span.d2edcug0.hpfvmrgz.qv66sw1b.c1et5uql.rrkovp55.a8c37x1j.keod5gw0.nxhoafnm.aigsh9s9.d3f4x2em.fe6kdd0r.mau55g9w.c8b282yb.iv3no6db.jq4qci2q.a3bd9o3v.lrazzd5p.oo9gr5id.hzawbc8m')
+    for name in names:
+        file_names.append(name.text)
     top_bar = driver.find_element_by_css_selector('div.rq0escxv.lpgh02oy.du4w35lb.rek2kq2y')
     download_urls = []
+    datas = [user_names,file_dates,file_names]
+    # Sanity check
+    #print([item[0] for item in datas])
+    #print([item[1] for item in datas])
     #Scroll back to the top
     driver.execute_script("window.scrollTo(0, 220)")
     time.sleep(1)
@@ -79,8 +96,29 @@ def goto_group_files(groupUrl,driver):
     for url in download_urls:
         print(f'Now doing file: {k} out of {len(download_urls)}')
         k +=1
-        driver.get(url)
-        time.sleep(2)
+        driver.set_page_load_timeout(download_time)
+        try:
+            driver.get(url)
+            time.sleep(2)
+        except TimeoutException as e:
+            pass
+    try:
+        time.sleep(120)
+        driver.quit()
+    except:
+        pass
+    return datas
+
+def rename_files(datas):
+    k = 0 
+    for data in datas[2]:
+        try:
+            os.rename(f'{download_dir}\\{datas[2][k]}',f'{download_dir}\\{datas[1][k]} {datas[0][k]} {datas[2][k]}')
+            k +=1
+        except:
+            k +=1
+            print('Failed to rename file, something might have gone wrong when downloading, or not, idk')
 
 driver = login()
-goto_group_files(groupUrl,driver)
+datas = goto_group_files(groupUrl,driver)
+rename_files(datas)
