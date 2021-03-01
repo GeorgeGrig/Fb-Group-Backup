@@ -6,20 +6,25 @@ from selenium.webdriver.firefox.options import Options
 from selenium.webdriver import ActionChains
 from selenium.webdriver.common.keys import Keys
 from selenium.common.exceptions import TimeoutException
-import time, os
+import time, os, json
 import itertools
 
-download_dir = 'D:\\Programming\\Current\\Fb-Group-Backup\\Downloads'
-groupUrl = 'https://www.facebook.com/groups/PhysicsDepThess/'
-download_time = '2'
+# Change settings in settings.json
+with open("settings.json", "r") as read_file:
+    data = json.load(read_file)
+
+download_dir = data["download_dir"]
+groupUrl = data["groupUrl"]
+download_time = data["download_time"]
+least_amount_scroll = data["least_amount_scroll"]
 
 # Set Firefox preferences so that the file automatically saves to disk when downloaded
 profile = webdriver.FirefoxProfile()
 profile.set_preference("browser.download.dir",download_dir)
 profile.set_preference("browser.download.folderList",2)
-profile.set_preference('browser.helperApps.neverAsk.saveToDisk','application/zip,application/pdf,application/octet-stream,application/x-zip-compressed,multipart/x-zip,application/x-rar-compressed, application/octet-stream,application/msword,application/vnd.ms-word.document.macroEnabled.12,application/vnd.openxmlformats-officedocument.wordprocessingml.document,application/vnd.ms-excel,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,application/vnd.openxmlformats-officedocument.wordprocessingml.document,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,application/rtf,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,application/vnd.ms-excel,application/vnd.ms-word.document.macroEnabled.12,application/vnd.openxmlformats-officedocument.wordprocessingml.document,application/xls,application/msword,text/csv,application/vnd.ms-excel.sheet.binary.macroEnabled.12,text/plain,text/csv/xls/xlsb,application/csv,application/download,application/vnd.openxmlformats-officedocument.presentationml.presentation,application/octet-stream')
+profile.set_preference('browser.helperApps.neverAsk.saveToDisk','application/zip,image/png,application/vnd.ms-powerpoint,application/vnd.openxmlformats-officedocument.presentationml.slideshow,application/pdf,application/octet-stream,application/x-zip-compressed,multipart/x-zip,application/x-rar-compressed, application/octet-stream,application/msword,application/vnd.ms-word.document.macroEnabled.12,application/vnd.openxmlformats-officedocument.wordprocessingml.document,application/vnd.ms-excel,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,application/vnd.openxmlformats-officedocument.wordprocessingml.document,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,application/rtf,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,application/vnd.ms-excel,application/vnd.ms-word.document.macroEnabled.12,application/vnd.openxmlformats-officedocument.wordprocessingml.document,application/xls,application/msword,text/csv,application/vnd.ms-excel.sheet.binary.macroEnabled.12,text/plain,text/csv/xls/xlsb,application/csv,application/download,application/vnd.openxmlformats-officedocument.presentationml.presentation,application/octet-stream')
 profile.set_preference("browser.download.manager.showWhenStarting",False)
-profile.set_preference("browser.helperApps.neverAsk.openFile","application/csv,application/excel,application/vnd.msexcel,application/vnd.ms-excel,text/anytext,text/comma-separated-values,text/csv,application/vnd.ms-excel,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,application/octet-stream");
+profile.set_preference("browser.helperApps.neverAsk.openFile","application/csv,image/png,application/vnd.ms-powerpoint,application/vnd.openxmlformats-officedocument.presentationml.slideshow,application/excel,application/vnd.msexcel,application/vnd.ms-excel,text/anytext,text/comma-separated-values,text/csv,application/vnd.ms-excel,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,application/octet-stream");
 profile.set_preference("browser.helperApps.alwaysAsk.force", False)
 profile.set_preference("browser.download.manager.useWindow", False)
 profile.set_preference("browser.download.manager.focusWhenStarting", False)
@@ -33,7 +38,7 @@ def login():
     # Manually login to avoid facebook's  bot detection
     driver = webdriver.Firefox(firefox_profile=profile)
     driver.get('https://www.facebook.com/login/web/')
-    input()
+    input('Login and press enter to start the script')
     return driver
 
 def goto_group_files(groupUrl,driver):
@@ -42,12 +47,14 @@ def goto_group_files(groupUrl,driver):
     # Scroll down to reveal all files
     SCROLL_PAUSE_TIME = 5
     last_height = driver.execute_script("return document.body.scrollHeight")
+    p = 0
     while True:
         driver.execute_script("window.scrollTo(0, document.body.scrollHeight);")
         time.sleep(SCROLL_PAUSE_TIME)
         new_height = driver.execute_script("return document.body.scrollHeight")
-        if new_height == last_height:
+        if new_height == last_height and p > int(least_amount_scroll):
             break
+        p += 1
         last_height = new_height
     # Get all triple dots button locations
     dots = driver.find_elements_by_css_selector('span.tmrshh9y.pfnyh3mw.j83agx80.bp9cbjyn')
@@ -74,8 +81,11 @@ def goto_group_files(groupUrl,driver):
     driver.execute_script("window.scrollTo(0, 220)")
     time.sleep(1)
     #For each dot, might skip the first two
+    n = 1
     for dot in dots:
         if not dot == dots[0]  and not dot == dots[1]:
+            print(f'Now doing button: {n} out of {len(dots)}')
+            n += 1
             view_port_height = "var viewPortHeight = Math.max(document.documentElement.clientHeight, window.innerHeight || 0);"
             element_top = "var elementTop = arguments[0].getBoundingClientRect().top;"
             js_function = "window.scrollBy(0, elementTop-(viewPortHeight/2));"
@@ -91,12 +101,11 @@ def goto_group_files(groupUrl,driver):
             time.sleep(1)
             # Click on top bar to hide previous download button
             ActionChains(driver).click(top_bar).perform()
-            print(len(download_urls))
         k = 1
     for url in download_urls:
-        print(f'Now doing file: {k} out of {len(download_urls)}')
+        print(f'Now downloading file: {k} out of {len(download_urls)}')
         k +=1
-        driver.set_page_load_timeout(download_time)
+        driver.set_page_load_timeout(float(download_time))
         try:
             driver.get(url)
             time.sleep(2)
