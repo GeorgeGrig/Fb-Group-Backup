@@ -6,6 +6,7 @@ from selenium.webdriver.firefox.options import Options
 from selenium.webdriver import ActionChains
 from selenium.webdriver.common.keys import Keys
 import time
+import itertools
 
 #options = Options()
 #options.headless = False
@@ -39,7 +40,7 @@ def navigate_group(groupUrl,driver):
 
 def goto_group_files(groupUrl,driver):
     driver.get(groupUrl+'files/')
-    SCROLL_PAUSE_TIME = 1
+    SCROLL_PAUSE_TIME = 3
     # Get scroll height
     last_height = driver.execute_script("return document.body.scrollHeight")
     while True:
@@ -55,17 +56,36 @@ def goto_group_files(groupUrl,driver):
             break
         last_height = new_height
     dots = driver.find_elements_by_css_selector('span.tmrshh9y.pfnyh3mw.j83agx80.bp9cbjyn')
+    top_bar = driver.find_element_by_css_selector('div.rq0escxv.lpgh02oy.du4w35lb.rek2kq2y')
     download_urls = []
-    #driver.execute_script("window.scroll(0, 0);")
+    #Scroll back to the top
+    body = driver.find_element_by_css_selector('body')
+    driver.execute_script("window.scrollTo(0, 220)")
+    N = 15
+    for _ in itertools.repeat(None, N):
+        #body.send_keys(Keys.PAGE_UP)
+        time.sleep(1)
     time.sleep(1)
+    body.send_keys(Keys.PAGE_DOWN)
     for dot in dots:
-        if not dot == dots[0]:
-            driver.execute_script("arguments[0].scrollIntoView();",dot)
+        if not dot == dots[0]  and not dot == dots[1]:
+            #coordinates = dot.location_once_scrolled_into_view # returns dict of X, Y coordinates
+            #driver.execute_script('window.scrollTo({}, {});'.format(coordinates['x'], coordinates['y']))
+            view_port_height = "var viewPortHeight = Math.max(document.documentElement.clientHeight, window.innerHeight || 0);"
+            element_top = "var elementTop = arguments[0].getBoundingClientRect().top;"
+            js_function = "window.scrollBy(0, elementTop-(viewPortHeight/2));"
+
+            scroll_into_middle = view_port_height + element_top + js_function
+
+            driver.execute_script(scroll_into_middle, dot)
             ActionChains(driver).click(dot).perform()
             time.sleep(1)
-            download_urls.append(driver.find_element_by_xpath("/html/body/div[1]/div/div[1]/div/div[3]/div/div/div[2]/div/div/div[1]/div[1]/div/div/div/div/div[1]/div/a[1]").get_attribute('href'))
+            try:
+                download_urls.append(driver.find_element_by_xpath("/html/body/div[1]/div/div[1]/div/div[3]/div/div/div[2]/div/div/div[1]/div[1]/div/div/div/div/div[1]/div/a[1]").get_attribute('href'))
+            except:
+                print('Failed to find download button')
             time.sleep(1)
-            ActionChains(driver).click(dot).perform()
+            ActionChains(driver).click(top_bar).perform()
             print(len(download_urls))
         k = 1
     for url in download_urls:
